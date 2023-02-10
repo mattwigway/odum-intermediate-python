@@ -1,0 +1,563 @@
+---
+title: Modularizing our notebooks
+author: Matt Bhagat-Conway
+format:
+    revealjs:
+        theme: [default, unc.scss]
+        width: 1600
+        height: 900
+        logo: UNC_logo_RGB.png
+---
+
+# Moving functions to modules/packages
+
+- So far, all of our functions have been defined in notebooks
+- Notebooks have a lot of disadvantages
+    - Can't share functions between them
+    - Difficult to track in version control
+    - Can't easily run on a server (e.g. longleaf)
+    - Hard to test automatically
+
+# Moving functions to modules/packages
+
+- That said, notebooks have a lot of advantages as well
+    - Interactive
+    - Easy to see/iterate on results of computations
+    - Can integrate code, text, and outputs - some people write whole papers as notebooks
+
+# Alternatives to notebooks: Python scripts
+
+- Python code can also be entered into `.py` files directly
+    - Easy to track in version control
+    - Runs easily on servers
+    - Can't incorporate outputs or text, just code and comments
+    - Still can't share code between files
+    - Still kinda a pain to test
+
+# Alternatives to notebooks: Python modules
+
+- Similar to scripts, code is entered into `.py` files
+- These files have a special structure
+- You can `import` a module and have all of the functions defined within available
+- Easy to track in version control
+- Can share code between files
+- Relatively simple to test
+- Difficult to run in general - more a collection of functions than a coherent analysis
+- No interactive output
+
+# Combining these (or, how to have your cake and eat it too)
+
+- My ideal workflow to maximize benefits and minimize downsides
+    - Most code goes in modules
+    - Notebooks or scripts are small, and execute the code from the module
+    - Modules can be tested, and code can be used interactively
+
+# In theory, theory and practice are the same thing...
+
+- I almost always start developing my code in notebooks before moving it to modules
+    - I often don't move it to modules at all (do as I say, not as I do...)
+
+# Creating a module
+
+- Let's modularize our analysis of the NYC traffic data
+- We'll move the functions we've written from notebooks into a new Python module
+- Let's start with data loading
+
+# Structure of a module
+
+- A module is just a folder with a file called `__init__.py` in it
+- Most modules will have many additional `.py` (Python) files to organize their code
+
+# Getting started with VSCode
+
+- Open VSCode
+- Use File -> Open Folder to open your `notebooks` folder
+
+# Creating our module
+
+- We'll call our module `nytraffic`
+- Create a folder `nytraffic`
+    - For now put it in the `notebooks` folder, so Python can find it
+- You can do this with either VSCode or the file manager
+
+# Creating our module
+
+- Create a file `__init__.py` in the `nytraffic` folder
+- Leave this file empty for now
+
+# Moving code into our module
+
+- You can put code directly into `__init__.py`, but I don't recommend it
+- With large projects, becomes unwieldy
+- Instead, let's create a file `load.py` in the `nytraffic` folder
+- Import pandas in that file, as you'll need it
+    - Imports need to be specified in every file of your module
+
+# Moving code into our module
+
+- Create a function in that file to load the data, call it `load_data`
+- Move all your data loading code from the notebook here
+- Everything in your module should be in a function; anything that isn't will be run when the module is first imported
+
+# Telling Python about your new file
+
+- The only file Python knows to run when loading your module is `__init__.py`
+- We need to tell Python about any files we add, by importing the functions we define
+- Add the following line to `__init__.py`:
+```python
+from .load import load_data
+```
+
+# Using our module
+
+- You can load the `nytraffic` module like any other: `import nytraffic`
+- In a notebook, though, you might want to use the `%autoreload` functionality
+- This will automatically reload the module when you change it - useful in development
+- Use it like this
+
+```python
+%load_ext autoreload
+%autoreload 2
+%aimport nytraffic
+```
+
+# Using our module
+
+- Now, we can replace all of the data loading code in our notebook with
+
+```python
+data = load_data()
+```
+- Run that and make sure it works
+
+# Making our code portable
+
+- Right now, the paths to the data files are hardwired in the module
+- This means that our module will break if we use it from another directory
+- Let's convert the paths to the files to arguments to the function
+
+# Moving analysis functions to files
+
+- We can also move our analysis functions into files
+- This is very useful for functions that will be used in multiple notebooks
+- There are advantages even if a function is only used in one notebook
+    - Ability to create automated tests
+    - Variable scoping that helps avoid errors (more on this later)
+
+# Moving analysis functions to files
+
+- Let's create a function that handles creating the `total` column
+- We'll structure this as a function that accepts a dataframe as an argument, and return a series (column)
+    - Generally, it's considered bad practice to mutate (modify) function arguments
+- Let's put this in a new `analysis.py` file
+
+# Moving analysis functions to files
+
+- Also create a function that returns a column for AM or PM total
+- Write this as a single function that takes an argument for whether to return AM or PM data
+
+# Moving analysis functions to files
+
+- Lastly, move your function to compute mean daily traffic to the analysis file
+
+# Variable scoping in functions in modules
+
+- Up until now, we've mostly written code in notebooks
+- Variables defined in a notebook are available throughout the notebook, unless they are defined inside a function
+- Like functions, modules have their own "scope" - their own set of variables
+- They cannot access variables defined elsewhere in your notebook/script
+- All data comes in through arguments
+
+# Variable scoping can prevent subtle errors
+
+What's wrong with this code?
+
+```python
+
+def do_analysis(dataframe):
+    return data.groupby("SegmentID").total.mean()
+```
+
+# Variable scoping can prevent subtle errors
+
+```python
+
+def do_analysis(dataframe):
+    return data.groupby("SegmentID").total.mean()
+```
+
+- In a notebook, if a variable `data` was defined, this function might work, but give the wrong answer if you tried to use it with a different data frame
+- In a module, you'll just get an error
+
+# Writing scripts
+
+- So far, all of our data analysis has been done in notebooks
+- Sometimes you will want to move your analysis into a script
+- Often this is the case if you need to run your code on a server/cluster (e.g. Longleaf)
+- It can also be handy for code you need to run repeatedly on different input files
+
+# What is a script
+
+- A `.py` file that runs code (doesn't just contain functions)
+- All code is run at once (no cells, no interactivity)
+- No automatic output of results
+
+# Running a script
+
+- Scripts are run from the command line or terminal
+- This is a textual interface for interacting with the computer, rather than the more common graphical ones
+
+# Writing our first script
+
+- We'll write a script that computes daily mean traffic by sensor
+- We'll use the functions from our module, so this should be a pretty short script
+- As we go through the script, we'll want to use `print()` to show our progress - since there's no interactive display of progress
+- There's also no display of results, so we'll save results to a CSV at the end
+
+# Result
+
+```python
+import nytraffic
+
+print("Loading data")
+data = nytraffic.load_data("../data/Traffic_Volume_Counts.csv", "../data/Traffic_Borough.csv")
+
+print("Creating total column")
+data["total"] = nytraffic.compute_total(data)
+
+print("Summarizing by day")
+by_day = nytraffic.mean_daily_traffic(data)
+
+print("Saving output")
+by_day.to_csv("Daily_Traffic.csv")
+```
+
+# What is the command line?
+
+- Git is a _command-line_ application
+- A way of interacting with the computer using a textual rather than graphical interface
+- To use the command line, you run _commands_. Each command has zero or more _options_ and _arguments_
+- When using the command line, you are always in a _working directory_. By default, commands will apply to files in this directory/folder.
+
+
+<!-- _class: center blank -->
+
+# What is the command line?
+
+![](cli-demo.svg){fig-alt="Demonstration of using the command line to list files in various directories"}
+
+<!-- _class: big -->
+
+# Anatomy of a command
+
+`ls -l slides`
+
+<br/>
+<br/>
+
+- `ls`: Command (`ls` - list files) - always first item
+- `-l`: Option (`-l` - long format) - always starts with `-` or `--`
+- `slides`: Argument (list files in the directory `slides`)
+- Press enter to run a command
+
+
+# Specifying folders/directories
+
+- Nested directories are separated with `/`
+- `Documents/PLAN372` refers to the `PLAN372` folder inside the `Documents` folder
+- `Documents/PLAN372/introduction.txt` refers to `introduction.txt` inside `PLAN372` inside `Documents`
+- Any number of nested directories and files is a _path_
+
+
+# Autocompletion
+
+- When typing a command or a directory, pressing `TAB` will autocomplete
+- If there is more than one possibility, `TAB` `TAB` will show possibilities
+
+
+# Escaping spaces
+
+- Spaces separate options and arguments
+- If you want to refer to a file or folder with a space in it, two options
+    - Put a `\` before the space
+        - e.g. `Documents/PLAN\ 372`
+    - Enclose the entire path in `'`
+        - e.g. `'Documents/PLAN 372`
+- Autocompletion will automatically escape any spaces it autocompletes
+
+
+# The _working directory_
+
+- When you use the command line, there is always a working directory
+- This is the folder that the terminal is running "in"
+- Any commands you type will refer to files in this folder, unless you specify a complete path
+
+
+# Useful commands
+
+- `cd directory`: Change the working directory
+    - `cd ..`: Change to the parent directory (e.g. if in `Documents/PLAN372`, would change to `Documents`)
+- `ls`: list files in the current working directory
+- `mv oldname newname`: rename files or move them between directories
+- `cp oldname newname`: copy file `oldname` to `newname`, which may be in a different directory
+- `mkdir name`: Make a folder/directory `name` in the working directory
+
+# Accessing the command line
+
+- Mac: Open the `Terminal` application in `Applications/Utilities`
+- Windows: Open the Anaconda PowerShell application (if you can't find this, we'll work through it—there's more variation in Windows Anaconda installs than Mac)
+- Everyone go ahead and do this now
+
+# Running the script
+
+- First, we need to navigate to the directory where the script is, using `cd` (and `ls` as needed)
+- Then, we can run it by just typing `python filename.py`
+- We should see the output from our print statements, and the new file we created should appear
+
+# Improving the script
+
+- Right now, the script won't work if the data files are moved, or the script runs in a different working directory
+- The paths to the files are hard-coded in the script
+- Like we did with the `load_data` function, we can make these arguments to the script
+
+# Command line arguments
+
+- We'd like our script to take three arguments: the names of the input files, and the name of the output files
+- Adding arguments to scripts is a bit more involved than adding arguments to a function
+- We'll use the built-in `argparse` Python module to add command line arguments to our script
+
+# Command line arguments
+
+- First, we have to import argparse at the top of our script
+- Then, we need to initialize the argument parser, like this:
+
+```python
+parser = argparse.ArgumentParser(
+    prog="daily_means",
+    description="Compute daily means of traffic data"
+)
+```
+
+# Command line arguments
+
+- Next, we need to tell Python which arguments we're expecting. The `help=` part is optional, but will generate useful usage instructions automatically
+
+```python
+parser.add_argument("input_data", help="Input CSV file with traffic counts")
+parser.add_argument("input_boroughs", help="Input boroughs file")
+parser.add_argument("output", help="Output file with daily average")
+```
+
+# Command line arguments
+
+- Then, we need to parse the arguments
+
+```python
+args = parser.parse_args()
+```
+
+# Using the arguments
+
+- Lastly, we just need to replace our hard-coded paths with `args.input_file`, `args.input_boroughs`, and `args.output`
+
+# Running the script
+
+- Run the script again, like we did before
+
+`python daily_means.py`
+
+# Running the script
+
+- We should get an error, because the script was expecting arguments
+
+```
+    usage: daily_means [-h] input_data input_boroughs output
+    daily_means: error: the following arguments are required: input_data, input_boroughs, output
+```
+
+# Running the script
+
+- This message/checking was done automatically by Python
+- Note that it also shows in the usage method that there is a `-h` option
+    - We didn't create this, but `-h` is typically "help", so Python created that for us
+
+# Running the script
+
+- Run the script with the paths to the appropriate files
+
+`python daily_means.py ../data/Traffic_Volume_Counts.csv ../data/Traffic_Borough.csv Traffic_Daily.csv`
+
+# Options (optional arguments)
+
+- We can also add options to our commands
+- Let's add a `--time-of-day` option to allow us to specify `AM`, `PM`, or `all`
+- With a default of `all`
+
+```python
+parser.add_argument("--time-of-day", help="Time of day (AM, PM, or all", default="all")
+```
+
+# Exercise
+
+- We just need to add an if/elif/else conditional to handle this in our script, so that the total column is based on the correct time of day
+- Note: the value of the `--time-of-day` option will be stored in `args.time_of_day`
+
+# Options
+
+```python
+if args.time_of_day.lower() == "all":
+    data["total"] = nytraffic.compute_total(data)
+elif args.time_of_day.lower() == "am":
+    data["total"] = nytraffic.partial_day_total(data, "AM")
+elif args.time_of_day.lower() == "pm":
+    data["total"] = nytraffic.partial_day_total(data, "PM")
+else:
+    print(f"Unknown time of day {args.time_of_day}")
+    exit(1)
+```
+
+# Why use a script and not a notebook?
+
+- Analysis that needs to be repeated
+- Analysis where options are useful
+- Analysis on a cloud server or compute cluster
+
+# Making your script find your package
+
+- Python will generally look for packages in the same directory as your notebook/script
+- If you want to put your package someplace else, you'll need to set your `PYTHONPATH` environment variable to include the folder that contains your `nytraffic` folder
+    - `export PYTHONPATH="/path/to/folder:$PYTHONPATH"`
+    - [More instructions here](https://bic-berkeley.github.io/psych-214-fall-2016/using_pythonpath.html)
+- You can also install your package like any other Python package; doing that is beyond the scope of this course (but sign up for Modular Design with Python)
+
+# Conda environments
+
+- If you have multiple projects, you may wish to use different library versions or Python versions
+- If you come back to a project in a few years, you may want to restore the exact versions of packages you had installed at the time
+
+# Conda environments
+
+- I recommend creating a new conda environment for each project
+- You can create conda environments on the command line, but I recommend using an `environment.yml` file
+
+# What is an `environment.yml` file?
+
+- Another text file
+- Contains a list of packages your project needs, and ideally their version
+- Allows you to create an environment with the same versions of packages later on
+
+# What does an `environment.yml` file look like?
+
+- List of dependencies (libraries) for your project, with associated versions
+
+```yaml
+name: nytraffic
+dependencies:
+    - python=3.9
+    - pandas=1.4
+    - numpy=1.23
+    - matplotlib=3.6
+    - ipykernel
+```
+
+# Creating an environment from your `environment.yml` file
+
+`conda env create -f environment.yml`
+
+# Using that environment
+
+- To run Python scripts in that environment:
+`conda activate nytraffic`
+
+# Using that environment
+
+- To use Jupyter with the environment, after activating environment:
+`python -m ipykernel install --user --name nytraffic-env --display-name "NY Traffic"`
+- Only need to do this once
+
+# Using the kernel
+
+- In JupyterLab or Jupyter Notebook, click on the kernel name (probably "Python 3") in the upper right
+- Select your "NY Traffic" kernel
+- If it's not there, restart JupyterLab and try again
+
+# Updating the environment
+
+- If you want to change the environment (new version, new package, etc.), first make the requisite change to `environment.yml`
+- Maybe we need to add `pytest`
+- First, find the version you want:
+`conda search pytest`
+- Add the following line:
+` - pytest=7.1`
+
+# Updating the environment
+
+- Run
+`conda env update -f environment.yml`
+
+# Keeping packages up to date
+
+`conda env update --all`
+- Will show what can be updated
+- Always press `n` - you don't want to get your environment out of sync with your `environment.yml`
+- But then update your `environment.yml`, and then your environment
+
+# Automated testing
+
+- Automated testing involves writing code that runs your functions and ensures they behave as expected
+- Often with simple/contrived input and output
+- There are a number of automated testing frameworks in Python, we'll use `pytest`
+
+# Writing automated tests
+
+- Any file in your module that is named `test_*.py` or `*_test.py` is considered a test
+- Tests should contain `assert` statements that check the operation of the function
+- When you run `pytest`, it will run all of these tests, and summarize which ones passed/failed
+
+# Let's write an automated test for our `compute_total` function
+
+- Create a Python file in your module, called `analysis_test.py`
+    - I like having a 1:1 mapping between source files and test files, but this is not required
+- Tests are grouped together within functions
+- Any function name starting with `test_` is considered a test
+
+# Let's write an automated test for our `compute_total` function
+
+- Often you need to get some fake data or something in place for a test
+- We'll manually create a DataFrame with time columns and one row of all ones, and another of all twos
+- First, import `pandas`
+- Also, import your `nytraffic` module
+
+# 
+
+```python
+def test_compute_total():
+    # Generate the column names programatically
+    # They are always from 1 hour to the hour one greater, except 12-1, so we
+    # replace 0 with 12 to get 12:00-1:00 instead of 0:00-1:00
+    hour_cols = [f"{i if i != 0 else 12}:00-{i+1}:00" for i in range(12)]
+    time_cols = [
+        *[f"{time}AM" for time in hour_cols],
+        *[f"{time}PM" for time in hour_cols]
+    ]
+
+    assert len(time_cols) == 24
+
+    test_data = pd.DataFrame({col: [1, 2] for col in time_cols})
+
+    assert (nytraffic.compute_total(test_data) == [24, 48]).all()
+```
+
+# Run the test
+
+- In your terminal, run `pytest`
+```
+============================ test session starts ============================
+platform darwin -- Python 3.9.16, pytest-7.1.2, pluggy-1.0.0
+rootdir: /Users/mwbc/git/odum-intermediate-python/notebooks/answers/nytraffic
+collected 1 item
+
+analysis_test.py .                                                    [100%]
+
+============================= 1 passed in 0.79s =============================
+```
