@@ -1,0 +1,1 @@
+This contains the worked examples for the Odum Intermediate Python class. The file paths in this folder are not updated, you will need to move them to the `notebooks` directory or update file paths to correctly refer to the data files for them to work.
